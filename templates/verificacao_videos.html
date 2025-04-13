@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificação de Vídeos - Sistema de Verificação de Resolução de Vídeos</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .drop-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .drop-area.active {
+            border-color: #0d6efd;
+            background-color: rgba(13, 110, 253, 0.05);
+        }
+        .progress {
+            height: 6px;
+        }
+        .icon-container {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f8f9fa;
+            border-radius: 50%;
+        }
+        .result-card {
+            border-left-width: 5px;
+        }
+        .result-card.compatible {
+            border-left-color: #198754;
+        }
+        .result-card.incompatible {
+            border-left-color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-5">
+        <div class="d-flex align-items-center mb-4">
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary me-3">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <h1>Verificação de Vídeos</h1>
+        </div>
+
+        <div class="row">
+            <div class="col-md-5">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h2 class="card-title h5 mb-0">Upload de Vídeo</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="drop-area" class="drop-area mb-4">
+                            <div id="upload-content">
+                                <div class="icon-container">
+                                    <i class="bi bi-cloud-arrow-up fs-1 text-muted"></i>
+                                </div>
+                                <p class="mb-2">Clique ou arraste um vídeo para esta área</p>
+                                <p class="text-muted small">Suporta arquivos MP4, AVI, MOV, MKV (máx. 100MB)</p>
+                            </div>
+                            
+                            <div id="progress-container" class="d-none">
+                                <p class="text-muted mb-2">Processando vídeo...</p>
+                                <div class="progress mb-2">
+                                    <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                </div>
+                                <p class="text-muted small"><span id="progress-text">0%</span></p>
+                            </div>
+                            
+                            <div id="video-info-container" class="d-none">
+                                <div class="icon-container">
+                                    <i class="bi bi-check-circle fs-1 text-primary"></i>
+                                </div>
+                                <p id="video-name" class="fw-medium mb-1"></p>
+                                <p id="video-details" class="text-muted small mb-3"></p>
+                                <button id="btn-change-video" class="btn btn-outline-secondary btn-sm">Trocar vídeo</button>
+                            </div>
+                            
+                            <input type="file" id="file-input" class="d-none" accept="video/mp4,video/avi,video/quicktime,video/x-matroska">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="ponto-select" class="form-label">Selecione o Ponto</label>
+                            <select class="form-select" id="ponto-select">
+                                <option value="">Selecione um ponto</option>
+                                {% for ponto in pontos %}
+                                    <option value="{{ ponto['id'] }}" data-largura="{{ ponto['largura'] }}" data-altura="{{ ponto['altura'] }}">
+                                        {{ ponto['nome'] }} ({{ ponto['largura'] }}x{{ ponto['altura'] }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        {% if pontos|length == 0 %}
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                Nenhum ponto cadastrado. 
+                                <a href="{{ url_for('cadastro_pontos') }}" class="alert-link">Cadastre pontos primeiro</a> 
+                                para poder verificar a compatibilidade.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-7">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h2 class="card-title h5 mb-0">Resultado da Verificação</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="resultado-placeholder" class="text-center py-5 text-muted">
+                            <p>Faça o upload de um vídeo e selecione um ponto para verificar a compatibilidade</p>
+                        </div>
+                        
+                        <div id="resultado-conteudo" class="d-none">
+                            <div class="card mb-3 bg-light">
+                                <div class="card-body">
+                                    <h3 class="h6 mb-3">Informações do Vídeo</h3>
+                                    <div class="row">
+                                        <div class="col-4 text-muted">Nome:</div>
+                                        <div class="col-8 fw-medium" id="info-video-nome"></div>
+                                        
+                                        <div class="col-4 text-muted">Resolução:</div>
+                                        <div class="col-8 fw-medium" id="info-video-resolucao"></div>
+                                        
+                                        <div class="col-4 text-muted">Tamanho:</div>
+                                        <div class="col-8 fw-medium" id="info-video-tamanho"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card mb-3 bg-light">
+                                <div class="card-body">
+                                    <h3 class="h6 mb-3">Ponto Selecionado</h3>
+                                    <div class="row">
+                                        <div class="col-4 text-muted">Nome:</div>
+                                        <div class="col-8 fw-medium" id="info-ponto-nome"></div>
+                                        
+                                        <div class="col-4 text-muted">Resolução Recomendada:</div>
+                                        <div class="col-8 fw-medium" id="info-ponto-resolucao"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="resultado-compatibilidade" class="card result-card">
+                                <div class="card-body d-flex">
+                                    <div class="me-3">
+                                        <i id="icone-compatibilidade" class="bi fs-1"></i>
+                                    </div>
+                                    <div>
+                                        <h3 id="titulo-compatibilidade" class="h5 mb-1"></h3>
+                                        <p id="mensagem-compatibilidade" class="mb-0"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast para mensagens -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+        <div id="toast-container"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Elementos da interface
+            const dropArea = document.getElementById('drop-area');
+            const fileInput = document.getElementById('file-input');
+            const uploadContent = document.getElementById('upload-content');
+            const progressContainer = document.getElementById('progress-container');
+            const progressBar = document.getElementById('progress-bar');
+            const progressText = document.getElementById('progress-text');
+            const videoInfoContainer = document.getElementById('video-info-container');
+            const videoName = document.getElementById('video-name');
+            const videoDetails = document.getElementById('video-details');
+            const btnChangeVideo = document.getElementById('btn-change-video');
+            const pontoSelect = document.getElementById('ponto-select');
+            
+            // Elementos do resultado
+            const resultadoPlaceholder = document.getElementById('resultado-placeholder');
+            const resultadoConteudo = document.getElementById('resultado-conteudo');
+            const infoVideoNome = document.getElementById('info-video-nome');
+            const infoVideoResolucao = document.getElementById('info-video-resolucao');
+            const infoVideoTamanho = document.getElementById('info-video-tamanho');
+            const infoPontoNome = document.getElementById('info-ponto-nome');
+            const infoPontoResolucao = document.getElementById('info-ponto-resolucao');
+            const resultadoCompatibilidade = document.getElementById('resultado-compatibilidade');
+            const iconeCompatibilidade = document.getElementById('icone-compatibilidade');
+            const tituloCompatibilidade = document.getElementById('titulo-compatibilidade');
+            const mensagemCompatibilidade = document.getElementById('mensagem-compatibilidade');
+            
+            // Variáveis para armazenar informações
+            let videoInfo = null;
+            
+            // Eventos de drag and drop
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, highlight, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, unhighlight, false);
+            });
+            
+            function highlight() {
+                dropArea.classList.add('active');
+            }
+            
+            function unhighlight() {
+                dropArea.classList.remove('active');
+            }
+            
+            // Evento de soltar arquivo
+            dropArea.addEventListener('drop', handleDrop, false);
+            
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                
+                if (files.length > 0) {
+                    handleFiles(files[0]);
+                }
+            }
+            
+            // Evento de clique na área de upload
+            dropArea.addEventListener('click', function() {
+                if (uploadContent.classList.contains('d-none')) return;
+                fileInput.click();
+            });
+            
+            // Evento de seleção de arquivo
+            fileInput.addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    handleFiles(this.files[0]);
+                }
+            });
+            
+            // Botão para trocar o vídeo
+            btnChangeVideo.addEventListener('click', function(e) {
+                e.stopPropagation();
+                resetUploadArea();
+            });
+            
+            // Função para processar o arquivo
+            function handleFiles(file) {
+                if (!file.type.match('video.*')) {
+                    showToast('Erro', 'Por favor, selecione um arquivo de vídeo válido', 'danger');
+                    return;
+                }
+                
+                // Mostrar progresso
+                uploadContent.classList.add('d-none');
+                videoInfoContainer.classList.add('d-none');
+                progressContainer.classList.remove('d-none');
+                
+                // Simular progresso
+                let progress = 0;
+                const interval = setInterval(() => {
+                    progress += 5;
+                    if (progress >= 95) {
+                        clearInterval(interval);
+                        progress = 95;
+                    }
+                    updateProgress(progress);
+                }, 100);
+                
+                // Enviar arquivo para o servidor
+                const formData = new FormData();
+                formData.append('video', file);
+                
+                fetch('/videos/analisar', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            throw new Error(data.error || 'Erro ao processar o vídeo');
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    clearInterval(interval);
+                    updateProgress(100);
+                    
+                    // Armazenar informações do vídeo
+                    videoInfo = data;
+                    
+                    // Atualizar interface após um pequeno delay
+                    setTimeout(() => {
+                        progressContainer.classList.add('d-none');
+                        videoInfoContainer.classList.remove('d-none');
+                        
+                        videoName.textContent = data.nome;
+                        videoDetails.textContent = `${data.largura} x ${data.altura} • ${data.tamanho}`;
+                        
+                        // Atualizar informações no resultado
+                        infoVideoNome.textContent = data.nome;
+                        infoVideoResolucao.textContent = `${data.largura} x ${data.altura}`;
+                        infoVideoTamanho.textContent = data.tamanho;
+                        
+                        // Verificar compatibilidade se um ponto estiver selecionado
+                        if (pontoSelect.value) {
+                            verificarCompatibilidade();
+                        }
+                    }, 500);
+                })
+                .catch(error => {
+                    clearInterval(interval);
+                    resetUploadArea();
+                    showToast('Erro', error.message, 'danger');
+                });
+            }
+            
+            // Atualizar barra de progresso
+            function updateProgress(value) {
+                progressBar.style.width = `${value}%`;
+                progressText.textContent = `${value}%`;
+            }
+            
+            // Resetar área de upload
+            function resetUploadArea() {
+                uploadContent.classList.remove('d-none');
+                progressContainer.classList.add('d-none');
+                videoInfoContainer.classList.add('d-none');
+                fileInput.value = '';
+                videoInfo = null;
+                
+                // Resetar resultado
+                if (!pontoSelect.value) {
+                    resultadoPlaceholder.classList.remove('d-none');
+                    resultadoConteudo.classList.add('d-none');
+                }
+            }
+            
+            // Evento de mudança no select de pontos
+            pontoSelect.addEventListener('change', function() {
+                if (this.value && videoInfo) {
+                    verificarCompatibilidade();
+                } else {
+                    resultadoPlaceholder.classList.remove('d-none');
+                    resultadoConteudo.classList.add('d-none');
+                }
+            });
+            
+            // Verificar compatibilidade
+            function verificarCompatibilidade() {
+                if (!videoInfo || !pontoSelect.value) return;
+                
+                const option = pontoSelect.options[pontoSelect.selectedIndex];
+                const pontoNome = option.text.split(' (')[0];
+                const pontoLargura = parseInt(option.dataset.largura);
+                const pontoAltura = parseInt(option.dataset.altura);
+                
+                // Atualizar informações do ponto
+                infoPontoNome.textContent = pontoNome;
+                infoPontoResolucao.textContent = `${pontoLargura} x ${pontoAltura}`;
+                
+                // Verificar compatibilidade
+                const compativel = videoInfo.largura === pontoLargura && videoInfo.altura === pontoAltura;
+                
+                // Atualizar resultado
+                resultadoCompatibilidade.className = compativel ? 
+                    'card result-card compatible' : 
+                    'card result-card incompatible';
+                
+                iconeCompatibilidade.className = compativel ? 
+                    'bi bi-check-circle fs-1 text-success' : 
+                    'bi bi-x-circle fs-1 text-danger';
+                
+                tituloCompatibilidade.textContent = compativel ? 
+                    'Resolução Compatível' : 
+                    'Resolução Incompatível';
+                
+                tituloCompatibilidade.className = compativel ? 
+                    'h5 mb-1 text-success' : 
+                    'h5 mb-1 text-danger';
+                
+                mensagemCompatibilidade.textContent = compativel ? 
+                    'Este vídeo tem a resolução ideal para o ponto selecionado.' : 
+                    'Este vídeo não tem a resolução ideal para o ponto selecionado.';
+                
+                mensagemCompatibilidade.className = compativel ? 
+                    'mb-0 text-success-emphasis' : 
+                    'mb-0 text-danger-emphasis';
+                
+                // Mostrar resultado
+                resultadoPlaceholder.classList.add('d-none');
+                resultadoConteudo.classList.remove('d-none');
+                
+                // Mostrar toast
+                showToast(
+                    compativel ? 'Compatível' : 'Incompatível',
+                    compativel ? 
+                        `O vídeo tem a resolução ideal para o ponto "${pontoNome}"` : 
+                        `O vídeo não tem a resolução ideal para o ponto "${pontoNome}"`,
+                    compativel ? 'success' : 'danger'
+                );
+            }
+            
+            // Função para mostrar toast
+            function showToast(title, message, type = 'primary') {
+                const toastContainer = document.getElementById('toast-container');
+                const toastId = 'toast-' + Date.now();
+                
+                const toastHTML = `
+                    <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+                        <div class="toast-header">
+                            <strong class="me-auto">${title}</strong>
+                            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                        <div class="toast-body bg-${type} bg-opacity-10 text-${type}-emphasis">
+                            ${message}
+                        </div>
+                    </div>
+                `;
+                
+                toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+                
+                const toastElement = document.getElementById(toastId);
+                const toast = new bootstrap.Toast(toastElement, { autohide: true, delay: 5000 });
+                toast.show();
+                
+                toastElement.addEventListener('hidden.bs.toast', function() {
+                    this.remove();
+                });
+            }
+        });
+    </script>
+</body>
+</html>
